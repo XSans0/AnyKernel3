@@ -469,7 +469,6 @@ export PATH="$AKHOME/bin:$AKHOME/tools:$PATH";
 if [ -f banner ]; then
   ui_printfile banner;
   ui_print " " " ";
-  sleep 5
 fi;
 
 KERNEL_STRING="$(file_getprop anykernel.sh kernel.string)";

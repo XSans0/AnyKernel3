@@ -509,6 +509,7 @@ OLD_PATH="$PATH";
 export PATH="$AKHOME/bin:$AKHOME/tools:$PATH";
 
 if [ -f banner ]; then
+  ui_print " " " ";
   ui_printfile banner;
   ui_print " " " ";
 fi;

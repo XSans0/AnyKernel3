@@ -212,8 +212,10 @@ repack_ramdisk() {
   [ $? != 0 ] && packfail=1;
 
   cd $home;
-  $bin/magiskboot cpio ramdisk-new.cpio test;
-  magisk_patched=$?;
+  if [ ! "$no_magisk_check" ]; then
+    $bin/magiskboot cpio ramdisk-new.cpio test;
+    magisk_patched=$?;
+  fi;
   [ $((magisk_patched & 3)) -eq 1 ] && $bin/magiskboot cpio ramdisk-new.cpio "extract .backup/.magisk $split_img/.magisk";
   if [ "$comp" ]; then
     $bin/magiskboot compress=$comp ramdisk-new.cpio;
@@ -315,7 +317,7 @@ flash_boot() {
     done;
     case $kernel in
       *Image*)
-        if [ ! "$magisk_patched" ]; then
+        if [ ! "$magisk_patched" -a ! "$no_magisk_check" ]; then
           $bin/magiskboot cpio ramdisk.cpio test;
           magisk_patched=$?;
         fi;
@@ -353,12 +355,15 @@ flash_boot() {
             echo "Attempting kernel unpack with busybox $comp..." >&2;
             $comp -dc $kernel > kernel;
           fi;
-          if strings kernel 2>/dev/null | grep -q -E '^/data/adb/ksud$'; then
+          strings kernel > stringstmp 2>/dev/null;
+          if grep -q -E '^/data/adb/ksud$' stringstmp; then
             touch $home/kernelsu_patched;
-            strings kernel 2>/dev/null | grep -E -m1 'Linux version.*#' > $home/vertmp;
+            grep -E -m1 'Linux version.*#' stringstmp > $home/vertmp;
+            [ -d $ramdisk/overlay.d ] && ui_print " " "Warning: overlay.d detected in ramdisk but not currently supported by KernelSU!";
           else
             ui_print " " "Warning: No KernelSU support detected in kernel!";
           fi;
+          rm -f stringstmp;
           if [ "$comp" ]; then
             $bin/magiskboot compress=$comp kernel kernel.$comp;
             if [ $? != 0 ] && $comp --help 2>/dev/null; then
@@ -384,11 +389,11 @@ flash_boot() {
       *) export PATCHVBMETAFLAG=false;;
     esac;
     $bin/magiskboot repack $nocompflag $bootimg $home/boot-new.img;
-    unset PATCHVBMETAFLAG;
   fi;
   if [ $? != 0 ]; then
     abort "Repacking image failed. Aborting...";
   fi;
+  [ "$PATCHVBMETAFLAG" ] && unset PATCHVBMETAFLAG;
   [ -f .magisk ] && touch $home/magisk_patched;
 
   cd $home;
@@ -871,7 +876,7 @@ setup_ak() {
       esac;
       for name in $parttype; do
         for part in $name$slot $name; do
-          if [ "$(grep -w "$part" /proc/mtd 2> /dev/null)" ]; then
+          if [ "$(grep -w "$part" /proc/mtd 2>/dev/null)" ]; then
             mtdmount=$(grep -w "$part" /proc/mtd);
             mtdpart=$(echo $mtdmount | cut -d\" -f2);
             if [ "$mtdpart" == "$part" ]; then
